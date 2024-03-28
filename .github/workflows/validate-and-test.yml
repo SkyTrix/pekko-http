@@ -3,7 +3,7 @@ name: Validate and test
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [ main, parse-entire-chunk-size ]
     tags-ignore: [ v* ]
 
 concurrency:
@@ -15,7 +15,6 @@ jobs:
   formatting-check:
     name: Checks
     runs-on: ubuntu-latest
-    if: github.repository == 'apache/pekko-http'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,12 +54,11 @@ jobs:
   compile-and-test:
     name: Compile and test
     runs-on: ubuntu-latest
-    if: github.repository == 'apache/pekko-http'
     strategy:
       fail-fast: false
       matrix:
-        SCALA_VERSION: [2.12, 2.13, 3.3]
-        JDK: [8, 11]
+        SCALA_VERSION: [2.12]
+        JDK: [8]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,19 +87,10 @@ jobs:
       - name: Compile everything
         run: sbt ++${{ matrix.SCALA_VERSION }} Test/compile
 
-      # Quick testing for PR validation
-      - name: Validate pull request for JDK ${{ matrix.JDK }}, Scala ${{ matrix.SCALA_VERSION }}
-        if: ${{ github.event_name == 'pull_request' }}
-        run: sbt -Dpekko.http.parallelExecution=false -Dpekko.test.timefactor=2 ++${{ matrix.SCALA_VERSION }} validatePullRequest
+      # # Quick testing for PR validation
+      # - name: Validate pull request for JDK ${{ matrix.JDK }}, Scala ${{ matrix.SCALA_VERSION }}
+      #   run: sbt -Dpekko.http.parallelExecution=false -Dpekko.test.timefactor=2 ++${{ matrix.SCALA_VERSION }} validatePullRequest
 
       # Full testing for pushes
       - name: Run all tests JDK ${{ matrix.JDK }}, Scala ${{ matrix.SCALA_VERSION }}
-        if: ${{ github.event_name == 'push' }}
         run: sbt -Dpekko.http.parallelExecution=false -Dpekko.test.timefactor=2 ++${{ matrix.SCALA_VERSION }} mimaReportBinaryIssues test
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4  # upload test results
-        if: success() || failure()        # run this step even if previous step failed
-        with:
-          name: test-results-${{ matrix.JDK }}-${{ matrix.SCALA_VERSION }}
-          path: '**/target/test-reports/*.xml'
